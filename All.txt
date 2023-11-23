@@ -1,0 +1,708 @@
+ALL
+-----------------------------------------------
+
+BASIC PLSQL
+----------------------------------------------------------
+
+create database library;
+
+use library;
+
+create table Borrower(Rollno int(4),Name varchar(20),DateofIssue date,NameofBook varchar(30),Status varchar(10));
+
+insert into Borrower values(14,'Ram','2022-09-19','Operating System','I');
+
+insert into Borrower values(27,'Soham','2022-07-24','Object Oriented Programming','I');
+
+insert into Borrower values(34,'Mohan','2022-06-12','Microprocessor','I');
+
+insert into Borrower values(48,'Om','2022-04-19','Mechanics','I');
+
+select * from Borrower;
+
+create table Fine(Rollno int(4),Date date,Amount int(10));
+
+delimiter //
+create procedure calc_Fine(in r int(10),in b varchar(30))
+begin
+declare doi date;
+declare diff int(3);
+select DateofIssue into doi from Borrower where Rollno=r and NameofBook=b;
+select datediff(curdate(),doi) into diff;
+if diff>=15 and diff<=30 then
+insert into Fine values(r,curdate(),diff*5);
+end if;
+if diff>30 then
+insert into Fine values(r,curdate(),diff*50);
+end if;
+end//
+
+delimiter //
+create procedure submit(in r int(2))
+begin
+update Borrower set Status='R' where Rollno=r;
+delete from Fine where Rollno=r;
+end//
+
+call calc_Fine(14,'Operating System'); 
+
+select * from Fine; 
+
+call calc_Fine(27,'Object Oriented Programming'); 
+
+call calc_Fine(34,'Microprocessor'); 
+
+call calc_Fine(48,'Mechanics'); 
+
+select * from Fine; 
+
+call submit(14); 
+
+call submit(27); 
+
+call submit(48); 
+
+call submit(34); 
+
+select * from Fine; 
+
+select * from Borrower; 
+
+
+--------------------------------
+PLSQL CURSER
+----------------------------
+
+create database class;
+use class;
+create table O_RollCall(roll_no int(3),name varchar(20));
+create table N_RollCall(roll_no int(3),name varchar(20));
+insert into O_RollCall values (1,'Himanshu');
+insert into O_RollCall values (2,'Ram');
+insert into O_RollCall values (3,'Soham');
+insert into O_RollCall values (5,'Mohan');
+insert into O_RollCall values (6,'Om');
+insert into O_RollCall values (9,'Yash');
+insert into O_RollCall values (11,'Mayur');
+select * from O_RollCall;
+select * from N_RollCall;
+delimiter //
+create procedure cursor_proc_p1()
+begin
+declare fin integer default 0;
+declare old_roll int(3);
+declare old_name varchar(20);
+declare new_roll int(3);
+declare old_csr cursor for select roll_no,name from O_RollCall;
+declare new_csr cursor for select roll_no from N_RollCall;
+declare continue handler for not found set fin=1;
+open old_csr;
+open new_csr;
+ss:loop
+fetch old_csr into old_roll,old_name;
+fetch new_csr into new_roll;
+if fin=1 then
+leave ss;
+end if;
+if old_roll<>new_roll then
+insert into N_RollCall values(old_roll,old_name);
+end if;
+end loop;
+close old_csr;
+close new_csr;
+end //
+create procedure cursor_proc_p2(in r1 int)
+begin
+declare r2 int;
+declare exit_loop boolean;
+declare c1 cursor for select roll_no from O_RollCall
+where roll_no>r1;
+declare continue handler for not found set
+exit_loop=true;
+open c1;
+e_loop:loop
+fetch c1 into r2;
+if not exists(select * from N_RollCall where roll_no=r2)
+then
+insert into N_RollCall select * from O_RollCall where roll_no=r2;
+end if;
+if exit_loop
+then
+close c1;
+leave e_loop;
+end if;
+end loop e_loop;
+end;//
+call cursor_proc_p2(5); //
+select * from O_RollCall; //
+select * from N_RollCall; //
+call cursor_proc_p2(3); //
+call cursor_proc_p1(); //
+select * from O_RollCall; //
+select * from N_RollCall; //
+
+
+
+---------------------------------
+PLSQL STORED PROCEDURE
+------------------------------------
+
+create database Score;
+use Score;
+create table stud_marks(name varchar(20),total_marks int(5));
+create table Result(roll_no int(3) primary key,name varchar(20),class varchar(20));
+insert into stud_marks values('Suresh',995);
+insert into stud_marks values('Harish',865);
+insert into stud_marks values('Samart',920);
+insert into stud_marks values('Mohan',1000);
+insert into stud_marks values('Soham',745);
+select * from stud_marks;
+insert into Result(roll_no,Name) values(1,'Suresh');
+insert into Result(roll_no,Name) values(2,'Harish');
+insert into Result(roll_no,Name) values(3,'Samart');
+insert into Result(roll_no,Name) values(4,'Mohan');
+insert into Result(roll_no,Name) values(5,'Soham');
+select * from Result;
+delimiter //
+create procedure proc_Grade(in r int(2),out grade char(25))
+begin
+declare m int(4);
+select total_marks into m from stud_marks where name=(select name from Result where roll_no=r);
+if m>=990 and m<=1500 then
+select 'Distinction' into grade;
+update Result set Class='Distinction' where Roll_no=r;
+elseif m>=900 and m<=989 then
+select 'FirstClass' into grade;
+update Result set Class='FirstClass' where Roll_no=r;
+elseif m>=825 and m<=899 then
+select 'SecondClass' into grade;
+update Result set Class='SecondClass' where Roll_no=r;
+else
+select '--' into grade;
+update Result set Class='--' where Roll_no=r;
+end if;
+end //
+delimiter //
+create function func_Grade(r int(2))
+returns varchar(25)
+deterministic
+begin
+declare grade varchar(25);
+call proc_Grade(r,grade);
+return grade;
+end //
+select func_Grade(1); //
+select func_Grade(2); //
+select func_Grade(3); //
+select func_Grade(4); //
+select func_Grade(5); //
+select * from Result; //
+
+---------------------------
+PLSQL TRIGGER
+--------------------------
+
+
+create database Score;
+use Score;
+create table stud_marks(name varchar(20),total_marks int(5));
+create table Result(roll_no int(3) primary key,name varchar(20),class varchar(20));
+insert into stud_marks values('Suresh',995);
+insert into stud_marks values('Harish',865);
+insert into stud_marks values('Samart',920);
+insert into stud_marks values('Mohan',1000);
+insert into stud_marks values('Soham',745);
+select * from stud_marks;
+insert into Result(roll_no,Name) values(1,'Suresh');
+insert into Result(roll_no,Name) values(2,'Harish');
+insert into Result(roll_no,Name) values(3,'Samart');
+insert into Result(roll_no,Name) values(4,'Mohan');
+insert into Result(roll_no,Name) values(5,'Soham');
+select * from Result;
+delimiter //
+create procedure proc_Grade(in r int(2),out grade char(25))
+begin
+declare m int(4);
+select total_marks into m from stud_marks where name=(select name from Result where roll_no=r);
+if m>=990 and m<=1500 then
+select 'Distinction' into grade;
+update Result set Class='Distinction' where Roll_no=r;
+elseif m>=900 and m<=989 then
+select 'FirstClass' into grade;
+update Result set Class='FirstClass' where Roll_no=r;
+elseif m>=825 and m<=899 then
+select 'SecondClass' into grade;
+update Result set Class='SecondClass' where Roll_no=r;
+else
+select '--' into grade;
+update Result set Class='--' where Roll_no=r;
+end if;
+end //
+delimiter //
+create function func_Grade(r int(2))
+returns varchar(25)
+deterministic
+begin
+declare grade varchar(25);
+call proc_Grade(r,grade);
+return grade;
+end //
+select func_Grade(1); //
+select func_Grade(2); //
+select func_Grade(3); //
+select func_Grade(4); //
+select func_Grade(5); //
+select * from Result; //
+
+
+-----------------------------
+MONGO CRUD
+-----------------------
+
+show dbs
+use book
+show collections;
+db.createCollection("library");
+db.library.insert({"bid":1,"name":"C++"});
+db.library.insert({"bid":2,"name":"SEPM","author":"Pressman"});
+db.library.insert({"bid":3,"name":"CN","author":"Forouzan","cost":700});
+db.library.find().pretty();
+db.library.remove({"bid":1});
+db.library.count();
+db.library.find().pretty();
+db.library.insert({"bid":1,"name":"C++"});
+db.library.find().pretty();
+db.library.find().sort({"bid":1})
+db.library.insert({"bid":4,"name":"SPOS","author":"Pearson","cost":500});
+db.library.find().pretty();
+db.library.find().sort({"bid":1})
+db.library.find({$and:[{"name":"CN"},{"cost":700}]}).pretty()
+db.library.insert({"bid":5,"name":"TOC","author":"Addison-Wesley","cost":600});
+db.library.insert({"bid":6,"name":"AI","author":"McGraw Hill Education","cost":800});
+db.library.find().pretty();
+db.library.find({$or:[{"cost":500},{"cost":800}]}).pretty()
+db.library.find({"cost":{$ne:500}})
+db.library.find({$nor:[{"cost":500},{"author":"Forouzan"}]})
+db.library.find({"cost":{$not:{$gt:800}}})
+db.library.insert({"bid":7,"name":"CC","author":"Wiley Publications","cost":400})
+db.library.find()
+db.library.update({'cost':400},{$set:{'cost':600}})
+db.library.update({'cost':800},{$set:{'cost':1200}})
+db.library.find().pretty();
+
+
+-------------------------------
+MongoDB Indexing and Agregation
+---------------------------------
+
+show dbs
+use customer
+db.cust_table.insert({Item_id:1,Cust_Name:"Ram",Product:"Milk",Amount:40});
+db.cust_table.insert({Item_id:2,Cust_Name:"Ram",Product:"Parle_G",Amount:50});
+db.cust_table.insert({Item_id:3,Cust_Name:"Mohan",Product:"Lays Chips",Amount:40});
+db.cust_table.insert({Item_id:4,Cust_Name:"Shivam",Product:"Mentos",Amount:10});
+db.cust_table.insert({Item_id:5,Cust_Name:"Mohan",Product:"Maggie",Amount:60});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$sum:"$Amount"}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$avg:"$Amount"}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$min:"$Amount"}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$max:"$Amount"}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$first:"$Amount"}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$last:"$Amount"}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$psuh:"$Amount"}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$sum:1}}});
+db.cust_table.aggregate({$group:{_id:"$Cust_Name","total":{$addToSet:"$Amount"}}});
+db.cust_table.createIndex({'Item_id':1})
+db.cust_table.createIndex({'Item_id':2})
+db.cust_table.createIndex({'Item_id':4})
+db.cust_table.getIndexes()
+db.cust_table.dropIndex({'Item_id':4})
+db.cust_table.dropIndex({'Item_id':1})
+db.cust_table.getIndexes()
+db.cust_table.getIndexes()
+
+-----------------------------------
+MongoDB Map Reduce
+------------------------------
+
+show dbs
+use bill
+db.pay.insert({Cust_ID:"A123",Product:"Milk",Amount:40,Status:"P"});
+db.pay.insert({Cust_ID:"A123",Product:"Parle_G",Amount:50,Status:"NP"});
+db.pay.insert({Cust_ID:"A123",Product:"Lays Chips",Amount:40,Status:"P"});
+db.pay.insert({Cust_ID:"B123",Product:"Mentos",Amount:10,Status:"P"});
+db.pay.insert({Cust_ID:"B123",Product:"Maggie",Amount:60,Status:"NP"});
+db.pay.find()
+db.pay.mapReduce(function(){emit(this.Cust_ID,this.Amount);},function(key,values){return Array.sum(values)},{query:{"Status":"NP"},out:"Bill_Amount"})
+var mapFunc1=function(){emit(this.Cust_ID,this.Amount);};
+var reduceFunc1=function(keyCustID,valuePrices){return Array.sum(valuePrices);};
+db.pay.mapReduce(mapFunc1,reduceFunc1,{out:"Map"})
+db.Bill_Amount.find()
+db.Map.find()
+
+---------------------------
+MongoDB Connectivity
+----------------------------
+package MongoDB;
+
+import java.util.Scanner;
+
+import com.mongodb.*;
+
+
+public class MongoDB {
+	public static void Stringdata(String data,DBCollection table) {
+		DBCursor cursor=table.find();
+		if(cursor.hasNext()) {
+		while(cursor.hasNext()) {
+			String Strdata=(String)cursor.next().get(data);
+			if(data=="Name") {
+			System.out.print(data+" :"+Strdata+"\t\t\t");
+			}
+			else {
+				System.out.print(data+":"+Strdata+"\t");
+			}
+		}
+		System.out.println(" ");
+	}
+		else {
+			System.out.print("");
+		}
+	}
+	
+	public static void Intdata(String data,DBCollection table) {
+		DBCursor cursor=table.find();
+		if(cursor.hasNext()) {
+		while(cursor.hasNext()) {
+			 int dataint=(Integer)cursor.next().get(data);
+			System.out.print(data+" :"+dataint+"\t\t\t\t");
+		}
+		System.out.println(" ");
+	}
+		else {
+			System.out.print("");
+		}
+	}
+	
+	public static void main(String[] args) throws Exception {
+		MongoClient mongo=new MongoClient("localhost",27017); 
+		System.out.println("Connected to the database successfully");
+		
+		Scanner sc=new Scanner(System.in);
+		int n,age=0;
+		String name=" ",mobileno=" ",ans=" ",ans1=" ";
+		
+		do {
+		DB db=mongo.getDB("Info");
+		DBCollection table=db.createCollection("Personal",null);
+		System.out.println("Enter the no of record you want to insert:");
+		n=sc.nextInt();
+		for(int i=1;i<=n;i++) {
+			BasicDBObject info= new BasicDBObject(i);
+			System.out.println("Enter Data"+(i));
+			System.out.print("Enter name:");
+			name=sc.next();
+			info.put("Name",name);
+			System.out.print("Enter age:");
+			age=sc.nextInt();
+			info.put("Age",age);
+			System.out.print("Enter Mobile Number:");
+			mobileno=sc.next();
+			info.put("Mobile Number",mobileno);
+			table.insert(info);
+		}
+		System.out.println("Insert Operation");
+		Stringdata("Name", table);
+		Stringdata("Mobile Number", table);
+		Intdata("Age", table);
+		
+		System.out.print("Enter the no of record you want to delete:");
+		n=sc.nextInt();
+		for(int i=1;i<=n;i++) {
+			BasicDBObject info= new BasicDBObject(i);
+			System.out.println("Enter Data"+(i));
+			System.out.print("Enter name:");
+			name=sc.next();
+			info.put("Name",name);
+			table.remove(info);
+		}
+
+		System.out.println("Delete Operation");
+		Stringdata("Name", table);
+		Stringdata("Mobile Number", table);
+		Intdata("Age", table);
+		System.out.println("Do yo want to drop database: ");
+		ans=sc.next();
+		if(ans.equals("y")||ans.equals("Y")){
+				db.dropDatabase();
+				System.out.println("Database Droped ");
+		}
+		System.out.println("Do you want to continue:");
+		ans1=sc.next();
+		}while(ans1.equals("y")||ans1.equals("Y"));
+	}
+
+}
+
+------------------------------------
+MONGO QUREY 5
+------------------------------------
+
+show dbs
+use book
+show collections;
+db.createCollection("library");
+db.library.insert({"bid":1,"name":"C++"});
+db.library.insert({"bid":2,"name":"SEPM","author":"Pressman"});
+db.library.insert({"bid":3,"name":"CN","author":"Forouzan","cost":700});
+db.library.find().pretty();
+db.library.count();
+db.library.insert({"bid":4,"name":"SPOS","author":"Pearson","cost":500});
+db.library.insert({"bid":5,"name":"TOC","author":"Addison-Wesley","cost":600});
+db.library.insert({"bid":6,"name":"AI","author":"McGraw Hill Education","cost":800});
+db.library.find().pretty();
+db.library.remove({"bid":1});
+db.library.find().pretty();
+db.library.find({$or:[{"cost":500},{"cost":800}]}).pretty()
+db.library.find({"cost":{$ne:500}})
+db.library.find({$nor:[{"cost":500},{"author":"Forouzan"}]})
+db.library.find({"cost":{$not:{$gt:800}}})
+db.library.save({"bid":7,"name":"CC","author":"Wiley Publications","cost":400})
+db.library.find()
+
+------------------------------------
+SQL CONNECTIVITY
+------------------------------------
+
+package MySql;
+
+import java.sql.*;
+import java.util.Scanner;
+
+public class MySql {
+
+	public static void main(String[] args) throws Exception {
+		 int n,sno;
+		 String name,telephone,gender;
+		 Scanner in=new Scanner(System.in);
+		 Connection con=DriverManager.getConnection("jdbc:mysql://localhost:3306/[Database]","[Username]","[password]");  
+		 Statement stmt=con.createStatement(); 
+		 PreparedStatement pstm=con.prepareStatement("insert into Personal values(?,?,?,?)");
+		 PreparedStatement pstm1=con.prepareStatement("delete from Personal where sno=?");
+		 System.out.print("Enter the no of record you want to insert:");
+		 n=in.nextInt();
+		 for(int i=0;i<n;i++) {
+			 System.out.print("\nData"+(i+1)+"\nEnter Sno:");
+			 sno=in.nextInt();
+			 pstm.setInt(1,sno);
+			 System.out.print("Enter Name:");
+			 name=in.next();
+			 pstm.setString(2,name);
+			 System.out.print("Enter Telephone:");
+			 telephone=in.next();
+			 pstm.setString(3,telephone);
+			 System.out.print("Enter Gender:");
+			 gender=in.next();
+			 pstm.setString(4,gender);
+			 pstm.executeUpdate();  
+		 }
+		 ResultSet rs=stmt.executeQuery("Select * from Personal;");
+		 System.out.println("\nAfter Insertion");
+		 System.out.println("Sno\tName\tTelephone\tGender");  
+		 while(rs.next()){ 
+				 System.out.println(rs.getInt(1)+"\t"+rs.getString(2)+"\t"+rs.getString(3)+"\t"+rs.getString(4));  
+		 }
+		 System.out.print("Enter the no of record you want to delete:");
+		 n=in.nextInt();
+		 for(int i=0;i<n;i++) {
+			 
+			 System.out.print("\nData"+(i+1)+"\nEnter Sno:");
+			 sno=in.nextInt();
+			 pstm1.setInt(1,sno);
+			 pstm1.executeUpdate();  
+		 }
+		 ResultSet rs1=stmt.executeQuery("Select * from Personal;");
+		 System.out.println("\nAfter Deletion");
+		 System.out.println("Sno\tName\tTelephone\tGender");  
+		 while(rs1.next()){ 
+				 System.out.println(rs1.getInt(1)+"\t"+rs1.getString(2)+"\t"+rs1.getString(3)+"\t"+rs1.getString(4));  
+		} 	 
+		 con.close();  
+	}
+}
+
+---------------------------------------------
+SQL CONNECTIVITY
+---------------------------------------------
+
+
+package MySql;
+
+import java.sql.*;
+import java.util.Scanner;
+
+public class MySql {
+
+	public static void main(String[] args) throws Exception {
+		 int n,sno;
+		 String name,telephone,gender;
+		 Scanner in=new Scanner(System.in);
+		 Connection con=DriverManager.getConnection("jdbc:mysql://localhost:3306/[Database]","[Username]","[password]");  
+		 Statement stmt=con.createStatement(); 
+		 PreparedStatement pstm=con.prepareStatement("insert into Personal values(?,?,?,?)");
+		 PreparedStatement pstm1=con.prepareStatement("delete from Personal where sno=?");
+		 System.out.print("Enter the no of record you want to insert:");
+		 n=in.nextInt();
+		 for(int i=0;i<n;i++) {
+			 System.out.print("\nData"+(i+1)+"\nEnter Sno:");
+			 sno=in.nextInt();
+			 pstm.setInt(1,sno);
+			 System.out.print("Enter Name:");
+			 name=in.next();
+			 pstm.setString(2,name);
+			 System.out.print("Enter Telephone:");
+			 telephone=in.next();
+			 pstm.setString(3,telephone);
+			 System.out.print("Enter Gender:");
+			 gender=in.next();
+			 pstm.setString(4,gender);
+			 pstm.executeUpdate();  
+		 }
+		 ResultSet rs=stmt.executeQuery("Select * from Personal;");
+		 System.out.println("\nAfter Insertion");
+		 System.out.println("Sno\tName\tTelephone\tGender");  
+		 while(rs.next()){ 
+				 System.out.println(rs.getInt(1)+"\t"+rs.getString(2)+"\t"+rs.getString(3)+"\t"+rs.getString(4));  
+		 }
+		 System.out.print("Enter the no of record you want to delete:");
+		 n=in.nextInt();
+		 for(int i=0;i<n;i++) {
+			 
+			 System.out.print("\nData"+(i+1)+"\nEnter Sno:");
+			 sno=in.nextInt();
+			 pstm1.setInt(1,sno);
+			 pstm1.executeUpdate();  
+		 }
+		 ResultSet rs1=stmt.executeQuery("Select * from Personal;");
+		 System.out.println("\nAfter Deletion");
+		 System.out.println("Sno\tName\tTelephone\tGender");  
+		 while(rs1.next()){ 
+				 System.out.println(rs1.getInt(1)+"\t"+rs1.getString(2)+"\t"+rs1.getString(3)+"\t"+rs1.getString(4));  
+		} 	 
+		 con.close();  
+	}
+}
+
+--------------------------------------------------
+SQL DDL
+------------------------------------------------------
+
+show databases;
+create database employee;
+use employee;
+create table emp_details(emp_no int(10),emp_name varchar(30),emp_gender varchar(1),emp_sal int(30));
+show tables;
+alter table emp_details add emp_dept varchar(20);
+desc emp_details;
+insert into emp_details values(1,'Ram','M',300000,'designing');
+insert into emp_details values(2,'Soham','M',300000,'designing');
+insert into emp_details values(3,'Mohan','M',250000,'management');
+insert into emp_details values(4,'Om','M',400000,'coding');
+select * from emp_details;
+create table emp_info as select emp_no,emp_name,emp_gender from emp_details;
+select * from emp_info;
+truncate table emp_info;
+select * from emp_info;
+drop table emp_info;
+select * from emp_info;
+create view emp_view1 as select * from emp_details;
+create view emp_view2 as select * from emp_details where emp_dept="designing";
+select * from emp_view1;
+select * from emp_view2;
+update emp_details set emp_dept="coding" where emp_name="Mohan";
+select * from emp_details;
+drop view emp_view1;
+drop view emp_view2;
+create index emp_ind on emp_details(emp_no,emp_name);
+show index from emp_details;
+
+
+
+-------------------------------------------
+SQL DML
+--------------------------------------------
+
+show databases;
+create database student;
+use student;
+create table stud_tab(stud_id int(4),stud_name varchar(20),stud_dept varchar(10),stud_dob date,stud_address varchar(10));
+desc stud_tab;
+insert into stud_tab values(1,'Ram','Comp','2002-11-05','Pune');
+insert into stud_tab values(2,'Soham','IT','2002-09-03','Nashik');
+insert into stud_tab values(3,'Ramesh','Comp','2002-03-19','Pune');
+insert into stud_tab values(4,'Mohan','AI&DS','2002-02-22','Nagpur');
+select * from stud_tab;
+alter table stud_tab add shift varchar(10);
+update stud_tab set shift='first' where stud_id=1;
+update stud_tab set shift='second' where stud_id=2;
+update stud_tab set shift='first' where stud_id=3;
+update stud_tab set shift='first' where stud_id=4;
+select * from stud_tab;
+insert into stud_tab values(5,'Omkar','ENTC','2002-06-26','Pune','second');
+select * from stud_tab;
+delete from stud_tab where stud_address='Nagpur';
+select * from stud_tab;
+update stud_tab set stud_id=4 where stud_name='Omkar';
+select * from stud_tab;
+select * from stud_tab where stud_dob between '2002-01-01' and '2002-07-01';
+alter table stud_tab add stud_fees int(15);
+update stud_tab set stud_fees=15000 where stud_id=1;
+update stud_tab set stud_fees=20000 where stud_id=2;
+update stud_tab set stud_fees=20000 where stud_id=3;
+update stud_tab set stud_fees=15000 where stud_id=4;
+select * from stud_tab;
+select * from stud_tab where stud_fees=(select max(stud_fees) from stud_tab);
+select sum(stud_fees) from stud_tab;
+create table stud_info as select stud_id,stud_name from stud_tab;
+select stud_id from stud_tab union select stud_id from stud_info;
+
+
+
+
+-----------------------------------------------
+SQL JOINS
+-------------------------------------------------]
+show databases;
+create database customer;
+show databases;
+use customer;
+create table cust_tab(id int(4),name varchar(20),quantity int(4),price int(10),item varchar(20));
+show tables;
+create table cust_info(id int(4),name varchar(20),address varchar(20),mobile varchar(20));
+desc cust_tab;
+desc cust_info;
+alter table cust_tab add primary key(id);
+alter table cust_info add foreign key(id) references cust_tab(id);
+insert into cust_tab values(1,'Ram',1,15,'Milk');
+insert into cust_tab values(2,'Soham',2,20,'Toast');
+insert into cust_tab values(3,'Mohan',4,5,'Parle-G');
+insert into cust_tab values(4,'Om',2,20,'Coca Cola');
+select * from cust_tab;
+alter table cust_tab add totalprice int(4);
+update cust_tab set totalprice=quantity*price where id=1;
+update cust_tab set totalprice=quantity*price where id=2;
+update cust_tab set totalprice=quantity*price where id=3;
+update cust_tab set totalprice=quantity*price where id=4;
+select * from cust_tab;
+insert into cust_info values(1,'Ram','Pune','9943569081');
+insert into cust_info values(2,'Soham','Pune','9978491281');
+insert into cust_info values(3,'Mohan','Nashik','8782356712');
+insert into cust_info values(4,'Om','Nagpur','7823450189');
+select * from cust_info;
+select cust_tab.id,cust_tab.name,cust_tab.item,cust_info.address from cust_tab inner join cust_info on cust_tab.id=cust_info.id;
+select cust_tab.id,cust_tab.name,cust_tab.item,cust_info.address from cust_tab left outer join cust_info on cust_tab.id=cust_info.id;
+select cust_tab.id,cust_tab.name,cust_tab.item,cust_info.address from cust_tab right outer join cust_info on cust_tab.id=cust_info.id;
+create view mul_view as select cust_tab.id,cust_tab.name,cust_info.address from cust_tab,cust_info where cust_info.id=cust_tab.id;
+select * from mul_view;
+
+
+
